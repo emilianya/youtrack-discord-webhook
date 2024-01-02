@@ -24,10 +24,12 @@ const EVENTS = [
         title: "Comment Added",
         newDescription: "$newValue",
         customCheck: function(issue) {
-            return issue.comments.isChanged;
+            return issue.comments.isChanged && issue.comments.added.size > 0;
         },
         valueGetter: function(issue) {
-            if (issue.comments.added.size < 1) return "lmao i can't code";
+            if (issue.comments.added.size < 1) {
+              return "This should not happen";
+            }
             return issue.comments.added.get(0).text;
         }
     },
@@ -36,6 +38,20 @@ const EVENTS = [
         newDescription: "The issue priority was set to $newValue.",
         changeDescription: "The issue priority was changed from $oldValue to $newValue.",
         issueKey: "Priority",
+        nameKey: "name"
+    },
+    {
+        title: "State Changed",
+        newDescription: "The issue state was set to $newValue.",
+        changeDescription: "The issue state was changed from $oldValue to $newValue.",
+        issueKey: "State",
+        nameKey: "name"
+    },
+    {
+        title: "Type Changed",
+        newDescription: "The issue type was set to $newValue.",
+        changeDescription: "The issue type was changed from [$oldValue] to [$newValue].",
+        issueKey: "Type",
         nameKey: "name"
     }
 ];
@@ -103,19 +119,35 @@ exports.rule = entities.Issue.onChange({
             let newValue;
 
             if (issueKey) {
-                oldValue = issue.oldValue(issueKey);
-                newValue = issue.fields[issueKey];
+                if (issueKey == "Type") {
+                  oldValue = issue.fields.oldValue("Type"); //.map(type => type.name).join(", ")
+                  newValue = issue.fields.Type; //.map(type => type.name).join(", ");
+                  let newValues = [];
+                  issue.fields.Type.forEach((type) => {
+                    newValues.push(type.name.toString());
+                  });
+                  let oldValues = [];
+                  issue.fields.oldValue("Type").forEach((type) => {
+                    oldValues.push(type.name.toString());
+                  });
+                  newValue = newValues.join(", ");
+                  oldValue = oldValues.join(", ");
+                } else {
+	              oldValue = issue.oldValue(issueKey);
+    	          newValue = issue.fields[issueKey];
+                }
             }
 
-            if (event.valueGetter) newValue = event.valueGetter(issue);
+          	if (issueKey != "Type") {
+              if (event.valueGetter) newValue = event.valueGetter(issue);
 
-            if (event.nameKey) {
-                if (oldValue) oldValue = oldValue[event.nameKey];
-                newValue = newValue[event.nameKey];
+              if (event.nameKey) {
+                  if (oldValue) oldValue = oldValue[event.nameKey];
+                  newValue = newValue[event.nameKey];
+              }
             }
 
             let description = oldValue ? event.changeDescription : event.newDescription;
-
             changes.push({
                 title: event.title,
                 description: description.replace("$oldValue", oldValue).replace("$newValue", newValue)
